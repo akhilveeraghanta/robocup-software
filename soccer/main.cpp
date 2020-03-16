@@ -18,6 +18,8 @@
 #include "Configuration.hpp"
 #include "ui/MainWindow.hpp"
 
+#include <ament_index_cpp/get_package_share_directory.hpp>
+
 using namespace std;
 
 //  we use this to catch Ctrl+C and kill the program
@@ -157,6 +159,8 @@ int main(int argc, char* argv[]) {
                 printf("Invalid option for vision channel\n");
                 usage(argv[0]);
             }
+        } else if (strcmp(var, "--ros-args") == 0) {
+            // Nothing to do for ROS for now, skip
         } else {
             printf("Not a valid flag: %s\n", argv[i]);
             usage(argv[0]);
@@ -170,8 +174,13 @@ int main(int argc, char* argv[]) {
 
     // Default config file name
     if (cfgFile.isNull()) {
-        cfgFile = ApplicationRunDirectory().filePath(sim ? "soccer-sim.cfg"
-                                                         : "soccer-real.cfg");
+        cfgFile = QString::fromStdString(
+                ament_index_cpp::get_package_share_directory("rj-robocup") + "/config/");
+        if (sim) {
+            cfgFile.append("soccer-sim.cfg");
+        } else {
+            cfgFile.append("soccer-real.cfg");
+        }
     }
 
     std::shared_ptr<Configuration> config =

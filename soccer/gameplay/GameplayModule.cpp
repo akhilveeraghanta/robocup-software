@@ -19,6 +19,9 @@
 #include "DebugDrawer.hpp"
 #include "robocup-py.hpp"
 
+// For getting data
+#include <ament_index_cpp/get_package_share_directory.hpp>
+
 using namespace Gameplay;
 
 REGISTER_CONFIGURABLE(GameplayModule);
@@ -85,15 +88,16 @@ Gameplay::GameplayModule::GameplayModule(Context* const context,
             _mainPyNamespace["robocup"] = robocup_module;
 
             QDir gameplayDir = ApplicationRunDirectory();
-            gameplayDir.cd("../soccer/gameplay");
 
-            // add gameplay directory to python import path (so import XXX)
-            // will look in the right directory
-            string importStmt = QString("import sys; sys.path.append('%1')")
-                                    .arg(gameplayDir.absolutePath())
-                                    .toStdString();
+            // Get the location of the share directory (where the python files
+            // are installed)
+            std::stringstream command;
+            command << "import sys; sys.path.append('"
+                    << ament_index_cpp::get_package_share_directory("rj-robocup")
+                    << "/gameplay/')";
             handle<> ignored2(
-                (PyRun_String(importStmt.data(), Py_file_input,
+                (PyRun_String(command.str().c_str(),
+                              Py_file_input,
                               _mainPyNamespace.ptr(), _mainPyNamespace.ptr())));
 
             _mainPyNamespace["constants"] =

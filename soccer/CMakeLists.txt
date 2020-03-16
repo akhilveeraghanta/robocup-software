@@ -158,6 +158,8 @@ target_link_libraries(robocup pthread)
 target_link_libraries(robocup spnav)
 target_link_libraries(robocup ${SDL2_LIBRARIES})
 
+ament_target_dependencies(robocup ament_index_cpp)
+
 
 # RRT
 include_directories(${RRT_INCLUDE_DIR})

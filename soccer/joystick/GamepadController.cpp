@@ -1,6 +1,8 @@
 #include "GamepadController.hpp"
 #include <algorithm>
 
+#include <ament_index_cpp/get_package_share_directory.hpp>
+
 using namespace std;
 
 namespace {
@@ -23,12 +25,11 @@ GamepadController::GamepadController()
         return;
     }
 
+    std::stringstream sdl_path;
+    sdl_path << ament_index_cpp::get_package_share_directory("rj-robocup") << "/gamecontrollerdb.txt";
+
     // Attempt to add additional mappings (relative to run)
-    if (SDL_GameControllerAddMappingsFromFile(
-            ApplicationRunDirectory()
-                .filePath("../external/sdlcontrollerdb/gamecontrollerdb.txt")
-                .toStdString()
-                .c_str()) == -1) {
+    if (SDL_GameControllerAddMappingsFromFile(sdl_path.str().c_str()) == -1) {
         cout << "Failed adding additional SDL Gamecontroller Mappings: "
              << SDL_GetError() << endl;
     }
