@@ -93,7 +93,7 @@ Gameplay::GameplayModule::GameplayModule(Context* const context,
             // are installed)
             std::stringstream command;
             command << "import sys; sys.path.append('"
-                    << ament_index_cpp::get_package_share_directory("rj-robocup")
+                    << ament_index_cpp::get_package_share_directory("soccer")
                     << "/gameplay/')";
             handle<> ignored2(
                 (PyRun_String(command.str().c_str(),

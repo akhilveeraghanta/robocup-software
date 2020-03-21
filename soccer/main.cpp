@@ -175,7 +175,7 @@ int main(int argc, char* argv[]) {
     // Default config file name
     if (cfgFile.isNull()) {
         cfgFile = QString::fromStdString(
-                ament_index_cpp::get_package_share_directory("rj-robocup") + "/config/");
+                ament_index_cpp::get_package_share_directory("soccer") + "/config/");
         if (sim) {
             cfgFile.append("soccer-sim.cfg");
         } else {

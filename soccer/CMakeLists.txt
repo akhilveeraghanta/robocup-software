@@ -1,9 +1,69 @@
+cmake_minimum_required(VERSION 3.8)
+project(soccer)
 
-# Qt
+# Default to C99
+if(NOT CMAKE_C_STANDARD)
+  set(CMAKE_C_STANDARD 99)
+endif()
+
+# Default to C++17
+if(NOT CMAKE_CXX_STANDARD)
+    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON) # Don't fall back to older versions
+endif()
+
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# include cmake files in the 'cmake folder'
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
+
+# find dependencies
+find_package(ament_index_cpp REQUIRED)
+find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_gtest REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(robocup_common REQUIRED)
+find_package(robocup_fshare REQUIRED)
+find_package(rrt REQUIRED)
+find_package(grSim REQUIRED)
+find_package(libusb-1.0 REQUIRED)
+
+# ------------------------------------------------------------------------------
+
+# Because we use ninja, we have to explicitly turn on color output for the compiler
+if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics -Werror=return-stack-address")
+else()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=return-local-addr")
+endif()
+
+# Use compiler optimization if we are making a release build.
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -march=native")
+
+# Build in debug mode
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -Og")
+
+# Turn some compiler warnings into errors
+# TODO determine if we want these flags in the release build
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Werror=return-type -Werror=delete-non-virtual-dtor")
+
+# Packages
 set(CMAKE_AUTOMOC ON)
+find_package(Qt5Widgets REQUIRED)
+add_definitions(-DQT_NO_KEYWORDS)
 
-# include Eigen3 for linear algebra
+find_package(PythonInterp 3.2 REQUIRED)
+find_package(PythonLibs 3.2 REQUIRED)
+
+find_package(Eigen3 REQUIRED)
 include_directories(SYSTEM ${EIGEN_INCLUDE_DIR})
+
+find_package(libusb-1.0 REQUIRED)
 
 # All sources for the robocup library used for the python module, soccer, and log log viewer
 # Note that main.cpp and LogViewer.cpp aren't present in this list because they're executable-specific
@@ -140,6 +200,10 @@ endif()
 # libusb
 include_directories(SYSTEM ${LIBUSB_1_INCLUDE_DIRS})
 
+# SDL2
+include(FindPkgConfig)
+pkg_search_module(SDL2 REQUIRED sdl2)
+
 # SDL
 include_directories(SYSTEM ${SDL2_INCLUDE_DIRS})
 
@@ -149,7 +213,7 @@ add_library(robocup SHARED ${ROBOCUP_LIB_SRC} ${SOCCER_UIS} ${SOCCER_RSRC})
 set_target_properties(robocup PROPERTIES PREFIX "")
 set_target_properties(robocup PROPERTIES SUFFIX ".so")
 
-target_link_libraries(robocup common rc-fshare)
+target_link_libraries(robocup ${robocup_common_LIBRARIES} ${robocup_fshare_LIBRARIES} ${rrt_LIBRARIES})
 qt5_use_modules(robocup Widgets Xml Core OpenGL Network Svg)
 target_link_libraries(robocup ${LIBUSB_1_LIBRARIES})
 target_link_libraries(robocup ${Boost_LIBRARIES} ${Boost_SYSTEM_LIBRARY})
@@ -158,13 +222,11 @@ target_link_libraries(robocup pthread)
 target_link_libraries(robocup spnav)
 target_link_libraries(robocup ${SDL2_LIBRARIES})
 
-ament_target_dependencies(robocup ament_index_cpp)
+include_directories(${robocup_common_INCLUDE_DIRS})
+include_directories(${rrt_INCLUDE_DIRS})
+include_directories(${robocup_fshare_INCLUDE_DIRS})
 
-
-# RRT
-include_directories(${RRT_INCLUDE_DIR})
-target_link_libraries(robocup RRT)
-
+ament_target_dependencies(robocup ament_index_cpp rrt robocup_common robocup_fshare)
 
 # python
 # note: these are set in the root CMakeLists.txt file
@@ -173,78 +235,85 @@ link_directories(${PYTHON_LINK_DIRS})
 target_link_libraries(robocup ${PYTHON_LIBRARIES})
 
 # 'soccer' program
-if(APPLE)
-    include(BundleUtilities)
-
-    # app icon
-    set(OSX_ICON_FILES ${CMAKE_CURRENT_SOURCE_DIR}/ui/qt/SoccerBall.icns)
-    set_source_files_properties(${OSX_ICON_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-    set(MACOSX_BUNDLE_ICON_FILE SoccerBall)
-
-    set(MACOSX_BUNDLE_GUI_IDENTIFIER "org.robojackets.robocup.soccer")
-
-    add_executable(soccer MACOSX_BUNDLE main.cpp ${OSX_ICON_FILES})
-
-    # add a script called "soccer" in the run/ dir that launches the soccer app and passes on all args,
-    # so it can be used the same way the soccer executable is used on Linux
-    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/soccer
-        "#!/bin/sh\n"
-        "$(dirname $0)/soccer.app/Contents/MacOS/soccer $@")
-    file(INSTALL ${CMAKE_CURRENT_BINARY_DIR}/soccer
-        DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
-        FILE_PERMISSIONS OWNER_READ GROUP_READ OWNER_WRITE GROUP_WRITE OWNER_EXECUTE GROUP_EXECUTE WORLD_EXECUTE)
-else()
-    add_executable(soccer main.cpp)
-endif()
+add_executable(soccer main.cpp)
 qt5_use_modules(soccer Widgets Xml Core OpenGL Network Svg)
 target_link_libraries(soccer robocup)
 
-# build the 'log_viewer' program
-qt5_add_resources(LOG_VIEWER_RSRC ui/qt/log_icons.qrc)
-qt5_wrap_ui(LOG_VIEWER_UI ui/qt/LogViewer.ui)
-set(LOG_VIEWER_SRC
-    "LogViewer.cpp"
-)
-add_executable(log_viewer ${LOG_VIEWER_SRC} ${LOG_VIEWER_UI} ${LOG_VIEWER_RSRC})
-qt5_use_modules(log_viewer Core Widgets OpenGL Svg Xml)
-target_link_libraries(log_viewer robocup)
+# ------------------------------------------------------------------------------
 
+if(BUILD_TESTING)
+    find_package(ament_lint_auto REQUIRED)
+    # the following line skips the linter which checks for copyrights
+    set(ament_cmake_copyright_FOUND TRUE)
+    # the following line skips cpplint (only works in a git repo)
+    set(ament_cmake_cpplint_FOUND TRUE)
+    ament_lint_auto_find_test_dependencies()
 
-# Add a test runner target "test-soccer" to run all tests in this directory
-set(SOCCER_TEST_SRC
-    "${CMAKE_SOURCE_DIR}/common/Geometry2d/LineTest.cpp"
-    "${CMAKE_SOURCE_DIR}/common/Geometry2d/PointTest.cpp"
-    "${CMAKE_SOURCE_DIR}/common/Geometry2d/RectTest.cpp"
-    "${CMAKE_SOURCE_DIR}/common/Geometry2d/SegmentTest.cpp"
-    "${CMAKE_SOURCE_DIR}/common/Geometry2d/CompositeShapeTest.cpp"
-    "${CMAKE_SOURCE_DIR}/common/Geometry2d/ArcTest.cpp"
-    "${CMAKE_SOURCE_DIR}/common/Geometry2d/TransformMatrixTest.cpp"
-    "${CMAKE_SOURCE_DIR}/common/Geometry2d/PoseTest.cpp"
-    "BatteryProfileTest.cpp"
-    "KickEvaluatorTest.cpp"
-    "motion/TrapezoidalMotionTest.cpp"
-    "optimization/GradientAscent1DTest.cpp"
-    "optimization/ParallelGradientAscent1DTest.cpp"
-    "optimization/NelderMead2DTest.cpp"
-    "planning/PathTest.cpp"
-    "planning/EscapeObstaclesPathPlannerTest.cpp"
-    "planning/TargetVelPathPlannerTest.cpp"
-    "TestMain.cpp"
-    "vision/tests/CameraBallTest.cpp"
-    "vision/tests/KalmanBallTest.cpp"
-    "vision/tests/WorldBallTest.cpp"
-    "vision/tests/CameraRobotTest.cpp"
-    "vision/tests/KalmanRobotTest.cpp"
-    "vision/tests/WorldRobotTest.cpp"
-    "vision/tests/BallBounceTest.cpp"
-    "vision/tests/CameraTest.cpp"
-    "WindowEvaluatorTest.cpp"
-)
-add_executable(test-soccer ${SOCCER_TEST_SRC})
-target_link_libraries(test-soccer robocup)
-qt5_use_modules(test-soccer Core Widgets Xml)
-target_link_libraries(test-soccer ${GTEST_LIBRARIES})
-add_dependencies(test-soccer googletest)
+    # Testing
+    include_directories(${GTEST_INCLUDE_DIRS})
 
-# Don't build the tests by default
-set_target_properties(test-soccer PROPERTIES EXCLUDE_FROM_ALL TRUE)
+    # Add a test runner target "test-soccer" to run all tests in this directory
+    set(SOCCER_TEST_SRC
+        "BatteryProfileTest.cpp"
+        "KickEvaluatorTest.cpp"
+        "motion/TrapezoidalMotionTest.cpp"
+        "optimization/GradientAscent1DTest.cpp"
+        "optimization/ParallelGradientAscent1DTest.cpp"
+        "optimization/NelderMead2DTest.cpp"
+        "planning/PathTest.cpp"
+        "planning/EscapeObstaclesPathPlannerTest.cpp"
+        "planning/TargetVelPathPlannerTest.cpp"
+        "TestMain.cpp"
+        "vision/tests/CameraBallTest.cpp"
+        "vision/tests/KalmanBallTest.cpp"
+        "vision/tests/WorldBallTest.cpp"
+        "vision/tests/CameraRobotTest.cpp"
+        "vision/tests/KalmanRobotTest.cpp"
+        "vision/tests/WorldRobotTest.cpp"
+        "vision/tests/BallBounceTest.cpp"
+        "vision/tests/CameraTest.cpp"
+        "WindowEvaluatorTest.cpp"
+    )
+
+    ament_add_gtest(test-soccer ${SOCCER_TEST_SRC})
+    if (TARGET test-soccer)
+        target_link_libraries(test-soccer robocup ${GTEST_LIBRARIES})
+        qt5_use_modules(test-soccer Core Widgets Xml)
+    endif()
+endif()
+
+# ------------------------------------------------------------------------------
+
+# Installation
+install(TARGETS robocup
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin)
+
+install(TARGETS soccer
+    DESTINATION lib/${PROJECT_NAME})
+
+install(DIRECTORY launch
+    DESTINATION share/${PROJECT_NAME})
+
+install(DIRECTORY
+    gameplay
+    DESTINATION share/${PROJECT_NAME}
+    FILES_MATCHING PATTERN "*.py")
+
+install(FILES
+    config/realShopField.xml
+    DESTINATION share/${PROJECT_NAME}/config
+    RENAME soccer-real.cfg)
+
+install(FILES
+    config/sim.xml
+    DESTINATION share/${PROJECT_NAME}/config
+    RENAME soccer-sim.cfg)
+
+install(FILES
+    sdlcontrollerdb/gamecontrollerdb.txt
+    DESTINATION share/${PROJECT_NAME})
+
+ament_export_dependencies(rrt robocup_common robocup_fshare grSim)
+ament_package()

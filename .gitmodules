@@ -19,3 +19,15 @@
 [submodule "external/sdlcontrollerdb"]
 	path = external/sdlcontrollerdb
 	url = https://github.com/kylestach/SDL_GameControllerDB
+[submodule "grSim"]
+	path = grSim
+	url = https://github.com/robojackets/grSim
+[submodule "robocup_fshare"]
+	path = robocup_fshare
+	url = https://github.com/robojackets/robocup-fshare
+[submodule "soccer/sdlcontrollerdb"]
+	path = soccer/sdlcontrollerdb
+	url = https://github.com/kylestach/SDL_GameControllerDB
+[submodule "rrt"]
+	path = rrt
+	url = https://github.com/robojackets/rrt

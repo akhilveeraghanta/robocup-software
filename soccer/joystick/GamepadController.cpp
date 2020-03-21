@@ -26,7 +26,7 @@ GamepadController::GamepadController()
     }
 
     std::stringstream sdl_path;
-    sdl_path << ament_index_cpp::get_package_share_directory("rj-robocup") << "/gamecontrollerdb.txt";
+    sdl_path << ament_index_cpp::get_package_share_directory("soccer") << "/gamecontrollerdb.txt";
 
     // Attempt to add additional mappings (relative to run)
     if (SDL_GameControllerAddMappingsFromFile(sdl_path.str().c_str()) == -1) {
